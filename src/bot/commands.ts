@@ -25,10 +25,12 @@ export class BotCommandHandler {
         { command: "status", description: "View lobby/game status" },
         { command: "left", description: "Leave the lobby" },
         { command: "help", description: "Show help and commands" },
+        { command: "password", description: "Promote to admin with password" },
         { command: "distribute", description: "Start game (admin)" },
         { command: "vote", description: "Start voting (admin)" },
         { command: "message", description: "Send message to all (admin)" },
         { command: "settimevote", description: "Set vote time (admin)" },
+        { command: "setimposters", description: "Set imposter count (admin)" },
         { command: "reveal", description: "View topic (admin)" },
         { command: "remove", description: "Remove player (admin)" },
         { command: "end", description: "End game (admin)" },
@@ -44,12 +46,13 @@ export class BotCommandHandler {
   }
 
   private registerCommands(): void {
-    this.bot.onText(/\/password:(.+)/, this.handlePassword.bind(this));
+    this.bot.onText(/\/password[:\s](.+)/, this.handlePassword.bind(this));
     this.bot.onText(/\/start/, this.handleStart.bind(this));
     this.bot.onText(/\/left/, this.handleLeft.bind(this));
     this.bot.onText(/\/remove/, this.handleRemove.bind(this));
     this.bot.onText(/\/online (true|false)/, this.handleOnline.bind(this));
     this.bot.onText(/\/setlinkgroup/, this.handleSetLinkGroup.bind(this));
+    this.bot.onText(/\/setimposters (\d+)/, this.handleSetImposters.bind(this));
     this.bot.onText(/\/distribute/, this.handleDistribute.bind(this));
     this.bot.onText(/\/reveal/, this.handleReveal.bind(this));
     this.bot.onText(/\/voteimposter_(.+)/, this.handleVoteFor.bind(this));
@@ -98,6 +101,7 @@ export class BotCommandHandler {
     );
     const providedPassword = match![1].trim();
 
+    // Try to delete the password message for security
     try {
       await this.bot.deleteMessage(chatId, msg.message_id);
     } catch (error) {
@@ -185,8 +189,15 @@ export class BotCommandHandler {
         ? `@${username}`
         : firstName || `User${userId}`;
       const totalPlayers = session.players.length;
-      const imposterCount = this.gameManager.getImposterCount(totalPlayers);
+      const imposterCount = this.gameManager.getImposterCount(
+        totalPlayers,
+        session.settings.customImposterCount
+      );
       const minPlayers = session.settings.minPlayers;
+      const customImposterCount = session.settings.customImposterCount;
+      const imposterInfo = customImposterCount
+        ? `${imposterCount} [CUSTOM]`
+        : `${imposterCount} (25%)`;
 
       // Create player list
       const playerList = session.players
@@ -200,7 +211,7 @@ export class BotCommandHandler {
 
       let message = `✅ ${playerName} joined the lobby!\n\n`;
       message += `👥 Players in lobby: ${totalPlayers}\n`;
-      message += `🎭 Imposters will be: ${imposterCount} (25%)\n`;
+      message += `🎭 Imposters will be: ${imposterInfo}\n`;
       message += `📋 Minimum players to start: ${minPlayers}\n\n`;
       message += `Player List:\n${playerList}\n\n`;
 
@@ -244,16 +255,24 @@ export class BotCommandHandler {
 
   private getAdminMenu(session: any): string {
     const totalPlayers = session.players.length;
-    const imposterCount = this.gameManager.getImposterCount(totalPlayers);
+    const imposterCount = this.gameManager.getImposterCount(
+      totalPlayers,
+      session.settings.customImposterCount
+    );
     const voteTime = session.settings.voteTimeSeconds || 120;
     const onlineMode = session.settings.onlineMode ? "ON" : "OFF";
+    const customImposterCount = session.settings.customImposterCount;
+    const imposterInfo = customImposterCount
+      ? `${imposterCount} [CUSTOM]`
+      : `${imposterCount} (25%)`;
 
     return (
       `🎮 Admin Controls\n\n` +
       `Commands:\n` +
-      `/distribute - Start game (${totalPlayers} players, ${imposterCount} imposters)\n` +
+      `/distribute - Start game (${totalPlayers} players, ${imposterInfo} imposters)\n` +
       `/vote - Start voting to eliminate a player\n` +
       `/settimevote <seconds> - Set vote time (current: ${voteTime}s)\n` +
+      `/setimposters <count> - Set imposter count (current: ${imposterInfo})\n` +
       `/message <text> - Send message to all lobby members\n` +
       `/online true/false - Toggle online mode (current: ${onlineMode})\n` +
       `/setlinkgroup <link> - Set custom group link for online mode\n` +
@@ -262,7 +281,7 @@ export class BotCommandHandler {
       `/end - End current game\n` +
       `/reset - Reset game\n` +
       `/status - View lobby status\n` +
-      `/password:<password> - Promote to admin`
+      `/password <password> - Promote to admin`
     );
   }
 
@@ -309,7 +328,14 @@ export class BotCommandHandler {
 
     const name = username ? `@${username}` : firstName || `User${userId}`;
     const totalPlayers = session.players.length;
-    const imposterCount = this.gameManager.getImposterCount(totalPlayers);
+    const imposterCount = this.gameManager.getImposterCount(
+      totalPlayers,
+      session.settings.customImposterCount
+    );
+    const customImposterCount = session.settings.customImposterCount;
+    const imposterInfo = customImposterCount
+      ? `${imposterCount} [CUSTOM]`
+      : `${imposterCount} (25%)`;
 
     // Create updated player list
     const playerList =
@@ -327,7 +353,7 @@ export class BotCommandHandler {
     let message = `👋 ${name} left the lobby\n\n`;
     message += `👥 Players remaining: ${totalPlayers}\n`;
     if (totalPlayers > 0) {
-      message += `🎭 Imposters will be: ${imposterCount} (25%)\n\n`;
+      message += `🎭 Imposters will be: ${imposterInfo}\n\n`;
       message += `Player List:\n${playerList}`;
     }
 
@@ -436,7 +462,14 @@ export class BotCommandHandler {
       ? `@${targetPlayer.username}`
       : targetPlayer.firstName || `User${targetUserId}`;
     const totalPlayers = session.players.length;
-    const imposterCount = this.gameManager.getImposterCount(totalPlayers);
+    const imposterCount = this.gameManager.getImposterCount(
+      totalPlayers,
+      session.settings.customImposterCount
+    );
+    const customImposterCount = session.settings.customImposterCount;
+    const imposterInfo = customImposterCount
+      ? `${imposterCount} [CUSTOM]`
+      : `${imposterCount} (25%)`;
 
     // Create updated player list
     const playerList =
@@ -454,7 +487,7 @@ export class BotCommandHandler {
     let message = `🚫 ${name} was removed from the lobby by admin\n\n`;
     message += `👥 Players remaining: ${totalPlayers}\n`;
     if (totalPlayers > 0) {
-      message += `🎭 Imposters will be: ${imposterCount} (25%)\n\n`;
+      message += `🎭 Imposters will be: ${imposterInfo}\n\n`;
       message += `Player List:\n${playerList}`;
     }
 
@@ -594,45 +627,6 @@ export class BotCommandHandler {
     );
   }
 
-  private async handleSetPlayers(
-    msg: Message,
-    match: RegExpExecArray | null
-  ): Promise<void> {
-    const chatId = msg.chat.id;
-    const chatType = msg.chat.type;
-    const userId = msg.from?.id;
-
-    if (!userId) return;
-
-    const effectiveChatId = this.gameManager.getEffectiveChatId(
-      chatId,
-      chatType
-    );
-
-    if (!(await this.gameManager.isAdmin(effectiveChatId, userId, chatType))) {
-      await this.bot.sendMessage(chatId, "❌ Admin only command");
-      return;
-    }
-
-    const count = parseInt(match![1]);
-    if (isNaN(count) || count < 1 || count > 50) {
-      await this.bot.sendMessage(chatId, "❌ Invalid number. Use 1-50");
-      return;
-    }
-
-    const session = this.gameManager.getOrCreateSession(effectiveChatId);
-    if (session.started) {
-      await this.bot.sendMessage(
-        chatId,
-        "❌ Cannot change settings during game"
-      );
-      return;
-    }
-
-    this.gameManager.updateSettings(effectiveChatId, { totalPlayers: count });
-    await this.bot.sendMessage(chatId, `✅ Set total players to ${count}`);
-  }
-
   private async handleSetImposters(
     msg: Message,
     match: RegExpExecArray | null
@@ -653,27 +647,53 @@ export class BotCommandHandler {
       return;
     }
 
-    const count = parseInt(match![1]);
     const session = this.gameManager.getOrCreateSession(effectiveChatId);
 
-    if (isNaN(count) || count < 1 || count >= session.settings.totalPlayers) {
+    if (session.started || session.rolesDistributed) {
       await this.bot.sendMessage(
         chatId,
-        `❌ Invalid number. Use 1-${session.settings.totalPlayers - 1}`
+        "❌ Cannot change imposter count during active game"
       );
       return;
     }
 
-    if (session.started) {
+    const count = parseInt(match![1]);
+    const totalPlayers = session.players.length;
+
+    if (isNaN(count) || count < 1) {
       await this.bot.sendMessage(
         chatId,
-        "❌ Cannot change settings during game"
+        "❌ Invalid number. Must be at least 1"
       );
       return;
     }
 
-    this.gameManager.updateSettings(effectiveChatId, { totalImposters: count });
-    await this.bot.sendMessage(chatId, `✅ Set imposters to ${count}`);
+    if (totalPlayers > 0 && count >= totalPlayers) {
+      await this.bot.sendMessage(
+        chatId,
+        `❌ Imposter count must be less than total players (${totalPlayers})`
+      );
+      return;
+    }
+
+    this.gameManager.updateSettings(effectiveChatId, {
+      customImposterCount: count,
+    });
+
+    const defaultCount = this.gameManager.getImposterCount(totalPlayers);
+    const percentage =
+      totalPlayers > 0 ? Math.round((count / totalPlayers) * 100) : 25;
+
+    let message = `✅ Imposter count set to ${count}`;
+    if (totalPlayers > 0) {
+      message += ` (${percentage}% of ${totalPlayers} players)`;
+      if (count !== defaultCount) {
+        message += `\n\n💡 Default would be ${defaultCount} (25%)`;
+      }
+    }
+    message += `\n\nUse /setimposters 0 to reset to default (25%)`;
+
+    await this.bot.sendMessage(chatId, message);
   }
 
   private async handleDistribute(msg: Message): Promise<void> {
@@ -713,7 +733,10 @@ export class BotCommandHandler {
     }
 
     const totalPlayers = session.players.length;
-    const imposterCount = this.gameManager.getImposterCount(totalPlayers);
+    const imposterCount = this.gameManager.getImposterCount(
+      totalPlayers,
+      session.settings.customImposterCount
+    );
 
     const prepMsg = await this.sendAndTrack(
       chatId,
@@ -859,7 +882,10 @@ export class BotCommandHandler {
     }
 
     const totalPlayers = session.players.length;
-    const imposterCount = this.gameManager.getImposterCount(totalPlayers);
+    const imposterCount = this.gameManager.getImposterCount(
+      totalPlayers,
+      session.settings.customImposterCount
+    );
 
     // Capture game data BEFORE endGame clears it
     const gameTopic = session.topic;
@@ -883,7 +909,7 @@ export class BotCommandHandler {
       `🎯 Topic: ${gameTopic}\n` +
       `🎭 Imposters were: ${imposterNames}\n\n` +
       `👥 Total Players: ${totalPlayers}\n` +
-      `🎭 Total Imposters: ${gameImposters.length}`;
+      `� Total Imposters: ${gameImposters.length}`;
 
     console.log(
       `📊 Game results: Topic="${gameTopic}", Imposters=${gameImposters.length}, Players=${totalPlayers}`
@@ -939,7 +965,9 @@ export class BotCommandHandler {
     await this.sendAndTrack(
       chatId,
       `👥 Players remain in lobby: ${totalPlayers}\n` +
-        `🎭 Next game will have ${imposterCount} imposters\n\n` +
+        `🎭 Next game will have ${imposterCount} imposter${
+          imposterCount > 1 ? "s" : ""
+        }\n\n` +
         `Use /distribute to start a new game or /reset to clear lobby.`
     );
 
@@ -999,7 +1027,10 @@ export class BotCommandHandler {
       : false;
 
     const totalPlayers = session.players.length;
-    const imposterCount = this.gameManager.getImposterCount(totalPlayers);
+    const imposterCount = this.gameManager.getImposterCount(
+      totalPlayers,
+      session.settings.customImposterCount
+    );
     const minPlayers = session.settings.minPlayers;
 
     // Determine game state
@@ -1059,7 +1090,11 @@ export class BotCommandHandler {
         statusText += `⚠️ You are not in the lobby\n`;
       }
       statusText += `\n👥 Players: ${totalPlayers}\n`;
-      statusText += `🎭 Imposters: ${imposterCount} (25%)\n`;
+      const customImposterCount = session.settings.customImposterCount;
+      const imposterInfo = customImposterCount
+        ? `${imposterCount} [CUSTOM]`
+        : `${imposterCount} (25%)`;
+      statusText += `🎭 Imposters: ${imposterInfo}\n`;
       statusText += `📋 Min Players: ${minPlayers}\n`;
       statusText += `⏱️ Vote Time: ${session.settings.voteTimeSeconds}s\n`;
       statusText += `📱 Online Mode: ${
@@ -1067,6 +1102,9 @@ export class BotCommandHandler {
       }\n`;
       if (session.customGroupLink) {
         statusText += `🔗 Custom Group Link: Set\n`;
+      }
+      if (customImposterCount) {
+        statusText += `🎭 Custom Imposter Count: ${customImposterCount}\n`;
       }
       statusText += `🔑 Promoted Admins: ${session.promotedAdmins.length}\n\n`;
 
@@ -1122,7 +1160,11 @@ export class BotCommandHandler {
       let statusText = `📊 Lobby Status\n\n`;
       statusText += `${gameStateEmoji} State: ${gameState}\n\n`;
       statusText += `👥 Players: ${totalPlayers}\n`;
-      statusText += `🎭 Imposters: ${imposterCount} (25%)\n\n`;
+      const customImposterCount = session.settings.customImposterCount;
+      const imposterInfo = customImposterCount
+        ? `${imposterCount} [CUSTOM]`
+        : `${imposterCount} (25%)`;
+      statusText += `🎭 Imposters: ${imposterInfo}\n\n`;
 
       if (session.players.length > 0) {
         statusText += `Player List:\n${playerList}\n\n`;
@@ -1312,6 +1354,7 @@ export class BotCommandHandler {
       helpText += `/distribute - Start the game and distribute roles\n`;
       helpText += `/vote - Start a voting session to eliminate a player\n`;
       helpText += `/settimevote <seconds> - Set voting time (10-600s)\n`;
+      helpText += `/setimposters <count> - Set imposter count (default: 25%)\n`;
       helpText += `/message <text> - Send message to all lobby members\n`;
       helpText += `/online true/false - Toggle online mode features\n`;
       helpText += `/setlinkgroup <link> - Set custom group link\n`;
@@ -1319,11 +1362,11 @@ export class BotCommandHandler {
       helpText += `/reveal - View the game topic privately (admin only)\n`;
       helpText += `/end - End the current game (keeps players in lobby)\n`;
       helpText += `/reset - Reset the entire game (clears all players)\n`;
-      helpText += `/password:<password> - Promote yourself to admin\n`;
+      helpText += `/password <password> - Promote yourself to admin\n`;
 
       helpText += `\n📊 Game Info:\n`;
       helpText += `• Minimum players: 4\n`;
-      helpText += `• Imposters: 25% of total players (minimum 1)\n`;
+      helpText += `• Imposters: 25% of total players by default (minimum 1)\n`;
       helpText += `• Players receive roles privately via DM\n`;
       helpText += `• Innocents get the topic, imposters don't\n`;
       helpText += `• Vote to eliminate suspected imposters\n`;
@@ -1649,7 +1692,7 @@ export class BotCommandHandler {
       );
 
       if (remainingImposters.length === 0) {
-        // Innocents win - show full game results
+        // Innocents win - show full game results and keep players in lobby
         const totalPlayers = session.players.length;
         const gameTopic = session.topic;
         const gameImposters = [...session.imposters];
@@ -1672,12 +1715,21 @@ export class BotCommandHandler {
         message += `🎭 Imposters were: ${imposterNames}\n`;
         message += `👥 Total Players: ${totalPlayers}\n`;
         message += `🎭 Total Imposters: ${gameImposters.length}\n\n`;
-        message += `Game Over! Use /reset to start a new game.`;
 
-        session.rolesDistributed = false;
-        session.started = false;
+        // End game but keep players in lobby
+        this.gameManager.endGame(effectiveChatId);
+
+        const imposterCount = this.gameManager.getImposterCount(
+          totalPlayers,
+          session.settings.customImposterCount
+        );
+        message += `👥 Players remain in lobby: ${totalPlayers}\n`;
+        message += `🎭 Next game will have ${imposterCount} imposter${
+          imposterCount > 1 ? "s" : ""
+        }\n\n`;
+        message += `Use /distribute to start a new game or /reset to clear lobby.`;
       } else if (remainingImposters.length >= remainingInnocent.length) {
-        // Imposters win - show full game results
+        // Imposters win - show full game results and keep players in lobby
         const totalPlayers = session.players.length;
         const gameTopic = session.topic;
         const gameImposters = [...session.imposters];
@@ -1700,10 +1752,19 @@ export class BotCommandHandler {
         message += `🎭 Imposters were: ${imposterNames}\n`;
         message += `👥 Total Players: ${totalPlayers}\n`;
         message += `🎭 Total Imposters: ${gameImposters.length}\n\n`;
-        message += `Game Over! Use /reset to start a new game.`;
 
-        session.rolesDistributed = false;
-        session.started = false;
+        // End game but keep players in lobby
+        this.gameManager.endGame(effectiveChatId);
+
+        const imposterCount = this.gameManager.getImposterCount(
+          totalPlayers,
+          session.settings.customImposterCount
+        );
+        message += `👥 Players remain in lobby: ${totalPlayers}\n`;
+        message += `🎭 Next game will have ${imposterCount} imposter${
+          imposterCount > 1 ? "s" : ""
+        }\n\n`;
+        message += `Use /distribute to start a new game or /reset to clear lobby.`;
       } else {
         message += `📊 Remaining:\n`;
         message += `👥 ${remainingInnocent.length} innocent players\n`;

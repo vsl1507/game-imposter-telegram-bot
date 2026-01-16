@@ -34,6 +34,7 @@ export interface GameSession {
     totalImposters: number;
     voteTimeSeconds: number;
     onlineMode: boolean;
+    customImposterCount?: number;
   };
 }
 

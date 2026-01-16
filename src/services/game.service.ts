@@ -132,9 +132,10 @@ export class GameManager {
 
     if (session.players.length < minPlayers) return false;
 
-    // Calculate imposters as 25% of total players (minimum 1)
+    // Calculate imposters - use custom count if set, otherwise default 25%
     const totalPlayers = session.players.length;
-    const imposterCount = Math.max(1, Math.floor(totalPlayers * 0.25));
+    const customCount = session.settings.customImposterCount;
+    const imposterCount = this.getImposterCount(totalPlayers, customCount);
 
     const playerIds = session.players.map((p) => p.userId);
     const shuffled = [...playerIds].sort(() => Math.random() - 0.5);
@@ -175,9 +176,12 @@ export class GameManager {
 
     this.storage.saveSession(chatId, session);
 
+    const percentage = Math.round((imposterCount / totalPlayers) * 100);
     console.log(`Game prepared in chat ${chatId}`);
     console.log(
-      `Total players: ${totalPlayers}, Imposters: ${imposterCount} (25%)`
+      `Total players: ${totalPlayers}, Imposters: ${imposterCount} (${percentage}%)${
+        customCount ? " [CUSTOM]" : ""
+      }`
     );
     console.log(`Topic: ${finalTopic} (${sourceInfo})`);
 
@@ -324,7 +328,16 @@ export class GameManager {
     this.storage.saveSession(chatId, session);
   }
 
-  getImposterCount(totalPlayers: number): number {
+  getImposterCount(totalPlayers: number, customCount?: number): number {
+    // If custom count is set and valid, use it
+    if (
+      customCount !== undefined &&
+      customCount > 0 &&
+      customCount < totalPlayers
+    ) {
+      return customCount;
+    }
+    // Otherwise use default 25%
     return Math.max(1, Math.floor(totalPlayers * 0.25));
   }
 
