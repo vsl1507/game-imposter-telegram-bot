@@ -18,26 +18,46 @@ export class BotCommandHandler {
 
   private async setupBotCommands(): Promise<void> {
     try {
-      // Set up commands for all users (includes both player and admin commands)
-      // Telegram will show all commands, and the bot will handle permissions
-      await this.bot.setMyCommands([
+      // Commands for all users (regular players)
+      const allUserCommands = [
+        { command: "start", description: "Join the game lobby" },
+        { command: "status", description: "View lobby/game status" },
+        { command: "left", description: "Leave the lobby" },
+        { command: "help", description: "Show help and commands" },
+      ];
+
+      // Commands for admins (includes all user commands + admin commands)
+      const adminCommands = [
         { command: "start", description: "Join the game lobby" },
         { command: "status", description: "View lobby/game status" },
         { command: "left", description: "Leave the lobby" },
         { command: "help", description: "Show help and commands" },
         { command: "password", description: "Promote to admin with password" },
-        { command: "distribute", description: "Start game (admin)" },
-        { command: "vote", description: "Start voting (admin)" },
-        { command: "message", description: "Send message to all (admin)" },
-        { command: "settimevote", description: "Set vote time (admin)" },
-        { command: "setimposters", description: "Set imposter count (admin)" },
-        { command: "reveal", description: "View topic (admin)" },
-        { command: "remove", description: "Remove player (admin)" },
-        { command: "end", description: "End game (admin)" },
-        { command: "reset", description: "Reset game (admin)" },
-        { command: "online", description: "Toggle online mode (admin)" },
-        { command: "setlinkgroup", description: "Set group link (admin)" },
-      ]);
+        { command: "distribute", description: "Start game" },
+        { command: "vote", description: "Start voting" },
+        { command: "message", description: "Send message to all" },
+        { command: "settimevote", description: "Set vote time" },
+        { command: "setimposters", description: "Set imposter count" },
+        { command: "reveal", description: "View topic" },
+        { command: "remove", description: "Remove player" },
+        { command: "end", description: "End game" },
+        { command: "reset", description: "Reset game" },
+        { command: "online", description: "Toggle online mode" },
+        { command: "setlinkgroup", description: "Set group link" },
+      ];
+
+      // Set commands for all users (default scope)
+      await this.bot.setMyCommands(allUserCommands);
+
+      // Set commands for group/supergroup admins
+      await this.bot.setMyCommands(adminCommands, {
+        scope: { type: "all_chat_administrators" },
+      });
+
+      // Set commands for group/supergroup members
+      await this.bot.setMyCommands(allUserCommands, {
+        scope: { type: "all_group_chats" },
+      });
 
       console.log("✅ Bot commands set up successfully");
     } catch (error) {
